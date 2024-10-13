@@ -2,29 +2,15 @@ import torch
 import torch.nn as nn
 import math
 
-class Dot_Product_Attention(nn.Module):
-    def __init__(self):
-        super().__init__()
-    
-    def forward(self, Q, K, V):
-        d_k = K.size(-1)
-
-        # Compute scaled dot-product attention
-        scores = torch.matmul(Q, K.transpose(-2,-1)) / math.sqrt(d_k)
-        attention_weights = torch.softmax(scores, dim=-1)
-        attention = torch.matmul(attention_weights, V)
-        return attention
-
 class Multi_Head_Attention(nn.Module):
     def __init__(self, d_model=512, num_heads=8):
         super().__init__()
         assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
-
         self.d_model = d_model
         self.num_heads = num_heads
         self.head_dim = d_model // num_heads
 
-        # Linear layers for Q, K, V projections
+        # Linear layers for Q, K, V 
         self.q_linear = nn.Linear(d_model, d_model)
         self.k_linear = nn.Linear(d_model, d_model)
         self.v_linear = nn.Linear(d_model, d_model)
@@ -33,6 +19,10 @@ class Multi_Head_Attention(nn.Module):
         self.out_proj = nn.Linear(d_model, d_model)
 
     def forward(self, Q, K, V):
+        # Q - query, K - key, V - value
+        # Q -  ask "what information do I need?"
+        # K -  determine "what information do I provide?"
+        # V -  supply "the information that will be used."
         batch_size = Q.shape[0]
 
         # Use the linear layers to project Q, K, V
@@ -60,28 +50,25 @@ class Multi_Head_Attention(nn.Module):
         return output
 
 class EncoderLayer(nn.Module):
-    def __init__(self, d_model=512, num_heads=8):
+    def __init__(self, d_model=512, num_heads=8, d_ff=2048):
         super().__init__()
-        self.attention = Multi_Head_Attention(d_model, num_heads)
-        self.norm1 = nn.LayerNorm(d_model)
-        self.ffn = nn.Sequential(
-            nn.Linear(d_model, d_model * 4),
+        self.self_attn = Multi_Head_Attention(d_model, num_heads)
+        self.feed_forward = nn.Sequential(
+            nn.Linear(d_model, d_ff),
             nn.ReLU(),
-            nn.Linear(d_model * 4, d_model)
+            nn.Linear(d_ff, d_model)
         )
+        self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
-    
+
     def forward(self, Q, K, V):
         # Multi-head attention with residual connection and normalization
-        attn_output = self.attention(Q, K, V)
-        Q = self.norm1(Q + attn_output)
+        Q = self.norm1(Q + self.self_attn(Q, K, V)[0])
         
         # Feed-forward network with residual connection and normalization
-        ffn_output = self.ffn(Q)
-        output = self.norm2(Q + ffn_output)
+        Q = self.norm2(Q + self.feed_forward(Q))
         
-        return output
-
+        return Q
 
 class Encoder(nn.Module):
     def __init__(self, d_model=512, num_heads=8, num_layers=6):
@@ -91,19 +78,61 @@ class Encoder(nn.Module):
     def forward(self, Q, K, V):
         for layer in self.layers:
             Q = layer(Q, K, V) 
-        return Q 
+        return Q
 
-def main():
-    test = True
-    if test:
-        Q = torch.randn([4,10,16])
-        K = torch.rand([4,10,16])
-        V = torch.rand([4,10,16])
-        dot_product = Dot_Product_Attention()
-        attention = dot_product(Q, K, V)
-        print(attention.shape)
+def multi_Head_Attention_example():
+    # Example usage of Multi_Head_Attention
+    input_tensor  = torch.rand([14], dtype=torch.float32) 
+
+    head_attention = Multi_Head_Attention()
+
+    Q_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
+    K_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
+    V_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
+
+    input_expand = input_tensor.unsqueeze(1).expand(14, 512)  # Now input is [14, 512]
+
+    Q = torch.matmul(input_expand , Q_matrix)
+    K = torch.matmul(input_expand, K_matrix)
+    V = torch.matmul(input_expand, V_matrix)
+
+    # Add a batch dimension to Q, K, V: [batch_size=1, seq_len=14, d_model=512]
+    Q = Q.unsqueeze(0)
+    K = K.unsqueeze(0)
+    V = V.unsqueeze(0)
+
+    output = head_attention(Q, K, V)
+
+    print(output.shape)
+
+def encoder_example():
+
+    input_tensor  = torch.rand([14], dtype=torch.float32) 
+
+    encoder = Encoder()
+
+    Q_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
+    K_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
+    V_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
+
+    input_expand = input_tensor.unsqueeze(1).expand(14, 512)  # Now input is [14, 512]
+
+    Q = torch.matmul(input_expand , Q_matrix)
+    K = torch.matmul(input_expand, K_matrix)
+    V = torch.matmul(input_expand, V_matrix)
+
+    # Add a batch dimension to Q, K, V: [batch_size=1, seq_len=14, d_model=512]
+    Q = Q.unsqueeze(0)
+    K = K.unsqueeze(0)
+    V = V.unsqueeze(0)
+
+    output = encoder(Q, K, V)
+
+    print(output.shape)
+
 
 if __name__ == "__main__":
-    main()
+    multi_Head_Attention_example()
+    encoder_example()
 
     
