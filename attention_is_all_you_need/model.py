@@ -70,6 +70,41 @@ class EncoderLayer(nn.Module):
         
         return Q
 
+class DecoderLayer(nn.Module):
+    def __init__(self, d_model=512, num_heads=8, d_ff=2048):
+        super().__init__()
+        self.self_attn = Multi_Head_Attention(d_model, num_heads)
+        self.feed_forward = nn.Sequential(
+            nn.Linear(d_model, d_ff),
+            nn.ReLU(),
+            nn.Linear(d_ff, d_model)
+        )
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.cross_attn = Multi_Head_Attention(d_model, num_heads)
+        self.norm3 = nn.LayerNorm(d_model)
+    
+    def forward(self, x, enc_output, tgt_mask=None, src_mask=None):
+        # Self-attention with causal mask
+        attn_output = self.self_attn(x, x, x, mask=tgt_mask)
+        x = self.norm1(x + attn_output)
+        
+        # Cross-attention
+        cross_attn_output = self.cross_attn(x, enc_output, enc_output, mask=src_mask)
+        x = self.norm2(x + cross_attn_output)
+        
+        # Feed-forward network
+        ff_output = self.feed_forward(x)
+        x = self.norm3(x + ff_output)
+        
+        return x
+
+# Add this function to generate the causal mask
+def generate_square_subsequent_mask(sz: int):
+    mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+    return mask
+
 class Encoder(nn.Module):
     def __init__(self, d_model=512, num_heads=8, num_layers=6):
         super().__init__()
@@ -79,6 +114,17 @@ class Encoder(nn.Module):
         for layer in self.layers:
             Q = layer(Q, K, V) 
         return Q
+    
+class Decoder(nn.Module):
+    def __init__(self, d_model=512, num_layers=6, num_heads=8, d_ff=2048):
+        super().__init__()
+        self.layers = nn.ModuleList([DecoderLayer(d_model, num_heads, d_ff) for _ in range(num_layers)])
+        self.norm = nn.LayerNorm(d_model)
+
+    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None):
+        for layer in self.layers:
+            tgt = layer(tgt, memory, tgt_mask, memory_mask)
+        return self.norm(tgt)
 
 class Embedding(nn.Module):
     def __init__(self, vocab_size, d_model):
@@ -93,12 +139,9 @@ def main():
     vocab_size = 10000  # Size of your vocabulary
     d_model = 512  # Dimension of the model
     input_tensor = torch.randint(0, vocab_size, (2, 10))
-    print(input_tensor)
     embedding = Embedding(vocab_size, d_model)
     output = embedding(input_tensor)
-    print(f"Embedding output shape: {output.shape}")
-
+    
 
 if __name__ == "__main__":
     main()
-    
