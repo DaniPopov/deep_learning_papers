@@ -80,59 +80,25 @@ class Encoder(nn.Module):
             Q = layer(Q, K, V) 
         return Q
 
-def multi_Head_Attention_example():
-    # Example usage of Multi_Head_Attention
-    input_tensor  = torch.rand([14], dtype=torch.float32) 
+class Embedding(nn.Module):
+    def __init__(self, vocab_size, d_model):
+        super(Embedding, self).__init__()
+        self.embedding = nn.Embedding(vocab_size, d_model)
+        self.d_model = d_model
 
-    head_attention = Multi_Head_Attention()
+    def forward(self, x):
+        return self.embedding(x) * math.sqrt(self.d_model)
 
-    Q_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
-    K_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
-    V_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
-
-    input_expand = input_tensor.unsqueeze(1).expand(14, 512)  # Now input is [14, 512]
-
-    Q = torch.matmul(input_expand , Q_matrix)
-    K = torch.matmul(input_expand, K_matrix)
-    V = torch.matmul(input_expand, V_matrix)
-
-    # Add a batch dimension to Q, K, V: [batch_size=1, seq_len=14, d_model=512]
-    Q = Q.unsqueeze(0)
-    K = K.unsqueeze(0)
-    V = V.unsqueeze(0)
-
-    output = head_attention(Q, K, V)
-
-    print(output.shape)
-
-def encoder_example():
-
-    input_tensor  = torch.rand([14], dtype=torch.float32) 
-
-    encoder = Encoder()
-
-    Q_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
-    K_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
-    V_matrix = nn.Parameter(torch.rand([512, 512], dtype=torch.float32)) 
-
-    input_expand = input_tensor.unsqueeze(1).expand(14, 512)  # Now input is [14, 512]
-
-    Q = torch.matmul(input_expand , Q_matrix)
-    K = torch.matmul(input_expand, K_matrix)
-    V = torch.matmul(input_expand, V_matrix)
-
-    # Add a batch dimension to Q, K, V: [batch_size=1, seq_len=14, d_model=512]
-    Q = Q.unsqueeze(0)
-    K = K.unsqueeze(0)
-    V = V.unsqueeze(0)
-
-    output = encoder(Q, K, V)
-
-    print(output.shape)
+def main():
+    vocab_size = 10000  # Size of your vocabulary
+    d_model = 512  # Dimension of the model
+    input_tensor = torch.randint(0, vocab_size, (2, 10))
+    print(input_tensor)
+    embedding = Embedding(vocab_size, d_model)
+    output = embedding(input_tensor)
+    print(f"Embedding output shape: {output.shape}")
 
 
 if __name__ == "__main__":
-    multi_Head_Attention_example()
-    encoder_example()
-
+    main()
     
